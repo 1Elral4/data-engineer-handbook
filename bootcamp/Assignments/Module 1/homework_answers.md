@@ -56,6 +56,81 @@ CREATE TABLE actors (
 ```
     
 2. **Cumulative table generation query:** Write a query that populates the `actors` table one year at a time.
+
+```sql
+
+
+-- year: min 1970, max 2021
+
+DO $$
+DECLARE
+  yr INT := 1970;  -- starting current_year
+BEGIN
+  WHILE yr <= 2021 LOOP
+    INSERT INTO actors (
+      actor_id,
+      actor_name,
+      year,
+      films,
+      quality_class,
+      is_active
+    )
+
+WITH
+last_year AS (
+	SELECT * FROM actors
+	WHERE year = yr - 1
+),
+current_year AS (
+	SELECT
+    actorid,
+    actor,
+    ARRAY_AGG(ROW(film, votes, rating, filmid)::film_info) AS films,
+    AVG(rating) AS avg_rating,
+	year
+  FROM actor_films
+  WHERE year = yr
+  GROUP BY actorid, actor, year
+)
+
+SELECT
+
+	COALESCE(ly.actor_id, cy.actorid) AS actor_id,
+	COALESCE(ly.actor_name, cy.actor) AS actor_name,
+	yr AS year,
+
+	COALESCE(ly.films, ARRAY[]::film_info[]) || 
+		CASE WHEN cy.year IS NOT NULL THEN cy.films 
+		END 
+	AS films,
+	
+ 	CASE 
+		WHEN cy.year IS NOT NULL THEN (
+			CASE
+			    WHEN cy.avg_rating > 8 THEN 'star'
+			    WHEN cy.avg_rating > 7 THEN 'good'
+			    WHEN cy.avg_rating > 6 THEN 'average'
+			    ELSE 'bad'
+			END::quality_class
+		)
+		ELSE ly.quality_class
+  	END AS quality_class,
+	
+	cy.year IS NOT NULL AS is_active
+
+	
+
+FROM last_year AS ly
+FULL OUTER JOIN current_year AS cy
+	ON cy.actorid = ly.actor_id;
+
+
+
+    yr := yr + 1;  -- increment year
+  END LOOP;
+END $$;
+
+```
     
 3. **DDL for `actors_history_scd` table:** Create a DDL for an `actors_history_scd` table with the following features:
     - Implements type 2 dimension modeling (i.e., includes `start_date` and `end_date` fields).
