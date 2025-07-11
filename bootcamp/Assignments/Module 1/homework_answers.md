@@ -140,13 +140,124 @@ END $$;
 CREATE TABLE actors_history_scd (
 	actor_id TEXT,
 	actor_name TEXT,
+	current_year INTEGER,
 	quality_class quality_class,
-	is_active BOOL,
-	startdate DATE,
-	endate DATE
+	is_active BOOLEAN,
+	startdate INTEGER,
+	endate INTEGER
 );
 ```
       
 4. **Backfill query for `actors_history_scd`:** Write a "backfill" query that can populate the entire `actors_history_scd` table in a single query.
+
+```sql
+-- CREATE TABLE actors_history_scd (
+-- 	actor_id TEXT,
+-- 	actor_name TEXT,
+--  year INTEGER,
+-- 	quality_class quality_class,
+-- 	is_active BOOL,
+-- 	startdate DATE,
+-- 	endate DATE
+-- );
+
+WITH 
+streak_started AS (
+
+	SELECT
+		actor_id,
+		actor_name,
+		year,
+		quality_class,
+		is_active,
+		lag(quality_class, 1) OVER( PARTITION BY actor_id ORDER BY year) <> quality_class 
+			OR lag(quality_class, 1) OVER( PARTITION BY actor_id ORDER BY year) IS NULL
+		AS did_change_quality_class,
+		lag(is_active, 1) OVER( PARTITION BY actor_id ORDER BY year) <> is_active
+			OR lag(is_active, 1) OVER( PARTITION BY actor_id ORDER BY year) IS NULL
+		AS did_change_is_active
+		
+
+	FROM actors
+
+), 
+
+streak_identified AS (
+
+	SELECT
+		actor_id,
+		actor_name,
+		year,
+		quality_class,
+		is_active,
+		SUM(CASE WHEN did_change_quality_class OR did_change_is_active THEN 1 ELSE 0 END) OVER (PARTITION BY actor_id ORDER BY year) AS streak_identifier
+
+	FROM streak_started
+), 
+
+aggregated AS (
+
+	SELECT
+		actor_id,
+		actor_name,
+		2021 as current_year,
+		quality_class,
+		is_active,
+		streak_identifier,
+		MIN(year) AS startdate,
+		MAX(year) AS endate
+		
+	FROM streak_identified
+	
+	GROUP BY 
+		actor_id,
+		actor_name,
+		quality_class,
+		is_active,
+		streak_identifier
+
+	ORDER BY streak_identifier
+
+)
+
+INSERT INTO actors_history_scd
+
+SELECT 
+	actor_id,
+	actor_name,
+	current_year,
+	quality_class,
+ 	is_active,
+	startdate,
+	endate
+	
+FROM aggregated
+
+```
+
+```sql
+WITH quality_years AS (
+  SELECT 
+    actor_name,
+    quality_class,
+    SUM((endate - startdate) + 1) AS quality_class_years
+  FROM actors_history_scd 
+  -- WHERE actor_name = '50 Cent'
+  GROUP BY actor_name, quality_class
+)
+
+SELECT 
+  actor_name,
+  quality_class,
+  quality_class_years,
+  ROUND(
+    100.0 * quality_class_years 
+    / SUM(quality_class_years) OVER (PARTITION BY actor_name),
+    2
+  ) AS percent_time
+FROM quality_years
+ORDER BY actor_name, quality_class_years DESC;
+```
+
     
 5. **Incremental query for `actors_history_scd`:** Write an "incremental" query that combines the previous year's SCD data with new incoming data from the `actors` table.
