@@ -261,3 +261,152 @@ ORDER BY actor_name, quality_class_years DESC;
 
     
 5. **Incremental query for `actors_history_scd`:** Write an "incremental" query that combines the previous year's SCD data with new incoming data from the `actors` table.
+
+
+```sql
+-- CREATE TABLE incremental_actors_history_scd (
+-- 	actor_id TEXT,
+-- 	actor_name TEXT,	
+-- 	quality_class quality_class,
+-- 	is_active BOOL,
+-- 	startdate INTEGER,
+-- 	endate INTEGER,
+--  current_year INTEGER
+-- );
+
+-- DROP TABLE incremental_actors_history_scd
+
+-- CREATE TYPE scd_type AS (
+--     quality_class quality_class,
+--     is_active boolean,
+--     startdate INTEGER,
+--     endate INTEGER
+-- );
+
+WITH
+
+historical_scd AS (
+	SELECT
+		actor_id,
+		actor_name,
+		quality_class,
+		is_active,
+		startdate,
+		endate
+	FROM incremental_actors_history_scd
+	WHERE current_year = 1970
+	AND endate < 1970
+
+
+),
+
+last_year AS (
+	SELECT *
+	FROM incremental_actors_history_scd
+	WHERE current_year = 1970
+	AND endate = 1970
+
+),
+
+this_year AS (
+	SELECT *
+	FROM actors
+	WHERE year = 1971
+),
+
+unchanged_records AS (
+
+	SELECT
+		ty.actor_id,
+		ty.actor_name,
+		ty.quality_class,
+		ty.is_active,
+		ly.startdate,
+		ty.year AS endate
+
+	FROM this_year AS ty
+	JOIN last_year AS ly
+		ON ly.actor_id = ty.actor_id
+	WHERE
+		TRUE
+		AND ty.quality_class = ly.quality_class
+		AND ty.is_active = ly.is_active
+	
+),
+
+changed_records  AS (
+
+	SELECT
+		ty.actor_id,
+		ty.actor_name,
+		UNNEST(ARRAY[
+			ROW(
+				ly.quality_class,
+				ly.is_active,
+				ly.startdate,
+				ly.endate
+			)::scd_type,
+			ROW(
+				ty.quality_class,
+				ty.is_active,
+				ty.year,
+				ty.year
+			)::scd_type
+
+		]) AS records
+		
+
+	FROM this_year AS ty
+	LEFT JOIN last_year AS ly
+		ON ly.actor_id = ty.actor_id
+	WHERE ty.quality_class <> ly.quality_class
+		OR ty.is_active <> ly.is_active
+
+),
+
+unnested_changed_records AS (
+	SELECT
+		actor_id,
+		actor_name,
+		(records).quality_class,
+		(records).is_active,
+		(records).startdate,
+		(records).endate
+
+	FROM changed_records
+),
+
+new_records AS (
+
+	SELECT
+		ty.actor_id,
+		ty.actor_name,
+		ty.quality_class,
+		ty.is_active,
+		ty.year AS start_date,
+		ty.year AS endate
+
+	FROM this_year AS ty
+	LEFT JOIN last_year AS ly
+		ON ly.actor_id = ty.actor_id
+	WHERE ly.actor_id IS NULL
+
+
+)
+
+
+-- INSERT INTO incremental_actors_history_scd
+
+SELECT *, 1971 AS current_year FROM (
+	SELECT * FROM historical_scd
+	UNION ALL
+	SELECT * FROM unchanged_records
+	UNION ALL
+	SELECT * FROM unnested_changed_records
+	UNION ALL
+	SELECT * FROM new_records
+
+) final
+
+
+```
