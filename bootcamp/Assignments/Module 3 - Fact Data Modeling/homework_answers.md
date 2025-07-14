@@ -21,6 +21,40 @@ JOIN games g on gd.game_id = g.game_id
   - data type here should look similar to `MAP<STRING, ARRAY[DATE]>`
     - or you could have `browser_type` as a column with multiple rows for each user (either way works, just be consistent!)
 
+```sql
+CREATE TYPE browser_types AS ENUM (
+	'Spider_Bot',
+    'LinkedInBot',
+    'ZoominfoBot',
+    '3+bottle',
+    'Maxthon',
+    'Applebot',
+    'Yeti',
+    'DataForSeoBot',
+    'SeekportBot',
+    'Facebook'
+)
+
+CREATE TABLE user_devices_cumulated (
+    user_id TEXT,
+    browser_type browser_types,
+    activity_dates DATE[],
+	  PRIMARY KEY(user_id)
+);
+```
+
+Another approach:
+
+```sql
+
+CREATE TABLE user_devices_cumulated (
+    user_id TEXT,
+    browser_activity JSONB,
+    PRIMARY KEY(user_id)
+);
+
+```
+
 - A cumulative query to generate `device_activity_datelist` from `events`
 
 - A `datelist_int` generation query. Convert the `device_activity_datelist` column into a `datelist_int` column 
