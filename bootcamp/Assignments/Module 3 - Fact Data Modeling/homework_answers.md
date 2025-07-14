@@ -142,9 +142,69 @@ ORDER BY user_id
 - A DDL for `hosts_cumulated` table 
   - a `host_activity_datelist` which logs to see which dates each host is experiencing any activity
 
-
+```sql
+CREATE TABLE host_cumulated (
+	host_name TEXT,
+	date DATE,
+	events_count BIGINT,
+	PRIMARY KEY(host_name, date)
+);
+```
   
 - The incremental query to generate `host_activity_datelist`
+
+```sql
+DO $$
+DECLARE
+    d DATE;
+BEGIN
+    FOR d IN SELECT generate_series('2022-12-31'::DATE, '2023-01-30'::DATE, '1 day'::INTERVAL) LOOP
+
+	WITH
+	
+	yesterday AS (
+	
+		SELECT * 
+		FROM host_cumulated
+		WHERE date = d
+	
+	),
+	
+	today AS (
+	
+		SELECT
+			host as host_name,
+			date(event_time) as date,
+			count(1) events_count
+	
+		FROM events
+		WHERE 
+			date(event_time) = d + INTERVAL '1 DAY'
+		GROUP BY host, date(event_time)
+			
+	)
+	
+	INSERT INTO host_cumulated
+	
+	SELECT 
+		COALESCE(t.host_name, y.host_name) AS host_name,
+		COALESCE(t.date, y.date + INTERVAL '1 DAY')::DATE AS date,
+	
+		CASE
+			WHEN t.events_count IS NULL THEN 0
+			ELSE t.events_count
+		END AS events_count
+		
+	FROM today AS t
+	FULL OUTER JOIN yesterday AS Y
+		ON y.host_name = t.host_name;
+
+    END LOOP;
+END $$;
+
+-- SELECT * FROM host_cumulated
+
+```
 
 - A monthly, reduced fact table DDL `host_activity_reduced`
    - month
