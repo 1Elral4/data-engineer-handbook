@@ -22,24 +22,13 @@ JOIN games g on gd.game_id = g.game_id
     - or you could have `browser_type` as a column with multiple rows for each user (either way works, just be consistent!)
 
 ```sql
-CREATE TYPE browser_types AS ENUM (
-	'Spider_Bot',
-    'LinkedInBot',
-    'ZoominfoBot',
-    '3+bottle',
-    'Maxthon',
-    'Applebot',
-    'Yeti',
-    'DataForSeoBot',
-    'SeekportBot',
-    'Facebook'
-)
 
 CREATE TABLE user_devices_cumulated (
     user_id TEXT,
-    browser_type browser_types,
+    browser_type TEXT,
+    date DATE,
     activity_dates DATE[],
-	  PRIMARY KEY(user_id)
+	  PRIMARY KEY(user_id, browser_type, date)
 );
 ```
 
@@ -47,7 +36,7 @@ Another approach:
 
 ```sql
 
-CREATE TABLE user_devices_cumulated (
+CREATE TABLE user_devices_cumulated_map (
     user_id TEXT,
     browser_activity JSONB,
     PRIMARY KEY(user_id)
@@ -57,7 +46,67 @@ CREATE TABLE user_devices_cumulated (
 
 - A cumulative query to generate `device_activity_datelist` from `events`
 
+```sql
+
+
+-- DROP TABLE user_devices_cumulated;
+-- CREATE TABLE user_devices_cumulated (
+--     user_id TEXT,
+--     browser_type TEXT,
+--     date DATE,
+--     activity_dates DATE[],
+-- 	  PRIMARY KEY(user_id, browser_type, date)
+-- );
+
+DO $$
+DECLARE
+    d DATE;
+BEGIN
+    FOR d IN SELECT generate_series('2022-12-31'::DATE, '2023-01-30'::DATE, '1 day'::INTERVAL) LOOP
+
+        WITH 
+        yesterday AS (
+            SELECT *
+            FROM user_devices_cumulated
+            WHERE date = d
+        ),
+        
+        today AS (
+            SELECT
+                CAST(e.user_id AS TEXT) AS user_id,
+                dvc.browser_type,
+                DATE(e.event_time) AS date_active
+            FROM events AS e
+            JOIN devices AS dvc ON dvc.device_id = e.device_id
+            WHERE
+                e.user_id IS NOT NULL
+                AND DATE(e.event_time) = d + INTERVAL '1 day'
+            GROUP BY e.user_id, dvc.browser_type, DATE(e.event_time)
+        )
+
+        INSERT INTO user_devices_cumulated (user_id, browser_type, date, activity_dates)
+        SELECT
+            COALESCE(t.user_id, y.user_id) AS user_id,
+            COALESCE(t.browser_type, y.browser_type) AS browser_type,
+            COALESCE(t.date_active, y.date + INTERVAL '1 day')::DATE AS date,
+            CASE
+                WHEN y.activity_dates IS NULL THEN ARRAY[t.date_active]
+                WHEN t.date_active IS NULL THEN y.activity_dates
+                ELSE ARRAY[t.date_active] || y.activity_dates
+            END AS activity_dates
+        FROM today AS t
+        FULL OUTER JOIN yesterday y
+            ON y.user_id = t.user_id AND y.browser_type = t.browser_type;
+
+    END LOOP;
+END $$;
+
+
+```
+
 - A `datelist_int` generation query. Convert the `device_activity_datelist` column into a `datelist_int` column 
+
+
 
 - A DDL for `hosts_cumulated` table 
   - a `host_activity_datelist` which logs to see which dates each host is experiencing any activity
