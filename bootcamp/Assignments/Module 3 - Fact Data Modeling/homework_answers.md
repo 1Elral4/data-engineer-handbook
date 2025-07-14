@@ -106,10 +106,43 @@ END $$;
 
 - A `datelist_int` generation query. Convert the `device_activity_datelist` column into a `datelist_int` column 
 
+```sql
 
+WITH
+
+users AS (
+
+	SELECT * 
+	FROM user_devices_cumulated
+	WHERE date = '2023-01-31'
+),
+
+series AS (
+
+	SELECT DATE(generate_series('2023-01-01'::DATE, '2023-01-31'::DATE, '1 day'::INTERVAL)) as series_date
+)
+
+SELECT 
+	-- create a binary code if in the date the user was active
+	CASE 
+		-- Does the array activity_dates contain the date series_date?
+		WHEN activity_dates @> ARRAY[series_date] 
+		THEN POW(2, 32 - (date - series_date))
+		ELSE 0 
+	END AS activity_bitmask, 
+	s.*,
+	u.*
+FROM users AS u
+CROSS JOIN series AS s
+ORDER BY user_id
+
+
+```
 
 - A DDL for `hosts_cumulated` table 
   - a `host_activity_datelist` which logs to see which dates each host is experiencing any activity
+
+
   
 - The incremental query to generate `host_activity_datelist`
 
