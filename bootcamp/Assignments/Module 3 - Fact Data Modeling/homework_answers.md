@@ -212,7 +212,98 @@ END $$;
    - hit_array - think COUNT(1)
    - unique_visitors array -  think COUNT(DISTINCT user_id)
 
+```sql
+CREATE TABLE host_activity_reduced (
+    month DATE,
+    host_name TEXT,
+    hit_array INTEGER[],           
+    unique_visitors INTEGER[],
+    PRIMARY KEY (month, host_name)
+);
+
+
+```
+
 - An incremental query that loads `host_activity_reduced`
   - day-by-day
+
+```sql
+-- DROP TABLE host_activity_reduced;
+-- CREATE TABLE host_activity_reduced (
+--     month DATE,
+--     host_name TEXT,
+--     hit_array INTEGER[],           
+--     unique_visitors INTEGER[],
+--     PRIMARY KEY (month, host_name)
+-- );
+
+DO $$
+DECLARE
+    d DATE;
+BEGIN
+    FOR d IN SELECT generate_series('2022-12-31'::DATE, '2023-01-30'::DATE, '1 day'::INTERVAL) LOOP
+    WITH
+
+    yesterday AS (
+
+        SELECT *
+        FROM host_activity_reduced
+        WHERE month = DATE_TRUNC('month', d::DATE)
+
+    ),
+
+    today AS (
+
+        SELECT
+            DATE_TRUNC('month', event_time::DATE)::DATE AS month,
+            host as host_name,
+            ARRAY[COUNT(1)] AS hits,
+            ARRAY[COUNT(DISTINCT user_id)] AS unique_visitors
+
+        FROM events
+        WHERE
+            TRUE
+            AND event_time::DATE = d + INTERVAL '1 DAY'
+            AND user_id IS NOT NULL
+        GROUP BY month, host_name
+
+    )
+
+    INSERT INTO host_activity_reduced (
+        month,
+        host_name,
+        hit_array,
+        unique_visitors
+    )
+    SELECT
+        COALESCE(t.month, y.month) AS month,
+        COALESCE(t.host_name, y.host_name) AS host_name,
+
+        CASE
+            WHEN y.hit_array IS NULL AND t.hits IS NOT NULL THEN t.hits
+            WHEN t.hits IS NULL THEN y.hit_array || ARRAY[0]
+            ELSE y.hit_array || t.hits
+        END AS hit_array,
+
+        CASE
+            WHEN y.unique_visitors IS NULL AND t.unique_visitors IS NOT NULL THEN t.unique_visitors
+            WHEN t.unique_visitors IS NULL THEN y.unique_visitors || ARRAY[0]
+            ELSE y.unique_visitors || t.unique_visitors
+        END AS unique_visitors
+
+    FROM today t
+    FULL OUTER JOIN yesterday y
+        ON t.host_name = y.host_name
+
+    ON CONFLICT (month, host_name)
+    DO UPDATE SET
+        hit_array = EXCLUDED.hit_array,
+        unique_visitors = EXCLUDED.unique_visitors;
+    END LOOP;
+END $$;
+
+SELECT *, CARDINALITY(hit_array), CARDINALITY(unique_visitors) FROM host_activity_reduced;
+
+```
 
 Please add these queries into a folder, zip them up and submit [here](https://bootcamp.techcreator.io)
