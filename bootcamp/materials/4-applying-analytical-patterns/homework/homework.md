@@ -63,24 +63,55 @@ FROM players_indicators AS pi
 
 ```sql
 WITH
+games_details_deduped AS (
+
+	SELECT
+		*,
+		ROW_NUMBER() OVER(PARTITION BY game_id, player_name) AS row_num
+	FROM game_details
+),
+
+
 grouped_game_details AS (
 	SELECT
 		COALESCE(gd.player_name, '(overall)') AS player_name,
 		COALESCE(gd.team_abbreviation, '(overall)') AS team_abbreviation,
 		COALESCE(g.season::TEXT, '(overall)') AS season,
-		COALESCE(SUM(pts), 0) as pts
+		COALESCE(SUM(gd.pts), 0) as pts,
+		COALESCE(SUM(
+					CASE
+					  WHEN gd.team_id = g.home_team_id AND g.pts_home > g.pts_away THEN 1
+					  WHEN gd.team_id = g.team_id_away AND g.pts_away > g.pts_home THEN 1
+					  ELSE 0
+					END)
+		,0) as player_wins,
+				
+		COALESCE(COUNT(DISTINCT
+			CASE
+			  WHEN gd.team_id = g.home_team_id AND g.pts_home > g.pts_away THEN g.game_id
+			  WHEN gd.team_id = g.team_id_away AND g.pts_away > g.pts_home THEN g.game_id
+			  ELSE NULL
+			END)
+		,0) as team_wins
 	
-	FROM game_details AS gd
+	FROM games_details_deduped AS gd
 	
 	JOIN games AS g
 		on g.game_id = gd.game_id
-	
+		
+	WHERE 
+		TRUE
+		AND row_num = 1 
+		-- and g.game_id = 22000692 -- for testing
+
 	GROUP BY GROUPING SETS (
 		(gd.player_name, gd.team_abbreviation),
 		(gd.player_name, g.season),
 	 	(gd.team_abbreviation)
 	)
 )
+
+
 
 (
 SELECT *, 'most points ever by a player' AS description FROM grouped_game_details
@@ -104,11 +135,27 @@ WHERE
 ORDER BY 4 DESC
 LIMIT 1
 )
+UNION ALL
+(
+SELECT *, 'most wins by a team' AS description FROM grouped_game_details
+WHERE 
+	TRUE
+	AND season = '(overall)'
+	AND player_name = '(overall)'
+
+
+ORDER BY 4 DESC
+LIMIT 1
+)
+
+
 ```
       
 - A query that uses window functions on `game_details` to find out the following things:
   - What is the most games a team has won in a 90 game stretch? 
   - How many games in a row did LeBron James score over 10 points a game?
+
+
 
 
 Please add these queries into a folder `homework/<discord-username>`
