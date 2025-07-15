@@ -15,3 +15,8 @@ In order to make sure your dashboard is publicly accessible to anyone without re
 -  Click on "File" in the menu.
 -  Select "Public" and then "Save to Tableau Public As…" if they are not already saved to Tableau Public.
 -  Once the dashboards are saved to Tableau Public, you will receive a proper URL from Tableau Public that starts with "https://public.tableau.com/views/".
+
+
+[Dashboard 1](https://public.tableau.com/views/DataPresentationProject_17184095710820/Dashboard1?:language=es-ES&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link)
+
+[Dashboard 2](https://public.tableau.com/views/RetailAnalytics_17182243108050/SalesbyCustomer?:language=es-ES&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link)
