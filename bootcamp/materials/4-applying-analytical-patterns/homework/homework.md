@@ -153,9 +153,79 @@ LIMIT 1
       
 - A query that uses window functions on `game_details` to find out the following things:
   - What is the most games a team has won in a 90 game stretch? 
+
+
+
   - How many games in a row did LeBron James score over 10 points a game?
 
+```sql
+-- Analysis of LeBron James' consecutive games scoring 10+ points
+-- Uses "islands and gaps" technique to identify scoring streaks
 
+WITH 
+-- Remove duplicate records for same game/player combinations
+games_details_deduped AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER(PARTITION BY game_id, player_name) AS row_num
+    FROM game_details
+),
+
+-- Prepare base dataset with game sequences and win/loss determination
+data_setup AS (
+    SELECT
+        DENSE_RANK() OVER(PARTITION BY gd.team_abbreviation ORDER BY g.game_date_est) AS team_games_sequence,
+        CASE
+            WHEN gd.team_id = g.home_team_id AND g.pts_home > g.pts_away THEN 1
+            WHEN gd.team_id = g.team_id_away AND g.pts_away > g.pts_home THEN 1
+            ELSE 0
+        END AS is_win,
+        *
+    FROM games_details_deduped AS gd
+    JOIN games AS g ON g.game_id = gd.game_id
+    WHERE row_num = 1  -- Only keep first occurrence of each game/player
+),
+
+-- Filter for LeBron James games and create chronological sequence
+lebron_games AS (
+    SELECT
+        game_date_est,
+        team_abbreviation,
+        COALESCE(pts, 0) AS pts,  -- Handle null points as 0
+        DENSE_RANK() OVER(ORDER BY game_date_est) AS lj_games_sequence
+    FROM data_setup
+    WHERE player_name = 'LeBron James'
+    ORDER BY game_date_est
+),
+
+-- Group consecutive games with 10+ points using islands and gaps technique
+lebron_streak_groups AS (
+    SELECT
+        -- Key formula: consecutive games scoring 10+ will have same group_id
+        lj_games_sequence - ROW_NUMBER() OVER(ORDER BY game_date_est) AS group_id
+    FROM lebron_games
+    WHERE pts > 10  -- Only games with more than 10 points
+),
+
+-- Calculate the length of each streak
+streaks AS (
+    SELECT
+        group_id,
+        COUNT(*) AS streak_length
+    FROM lebron_streak_groups
+    GROUP BY group_id
+)
+
+-- Final output: distribution of streak lengths
+SELECT
+    streak_length,
+    COUNT(*) AS num_occurrences
+FROM streaks
+GROUP BY streak_length
+ORDER BY streak_length;
+
+
+```
 
 
 Please add these queries into a folder `homework/<discord-username>`
