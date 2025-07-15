@@ -154,7 +154,76 @@ LIMIT 1
 - A query that uses window functions on `game_details` to find out the following things:
   - What is the most games a team has won in a 90 game stretch? 
 
+``` sql
+WITH
+games_details_deduped AS (
 
+	SELECT
+		*,
+		ROW_NUMBER() OVER(PARTITION BY game_id, player_name) AS row_num
+	FROM game_details
+),
+
+data_setup AS (
+
+SELECT
+
+	DENSE_RANK() OVER(PARTITION BY gd.team_abbreviation ORDER BY g.game_date_est) AS team_games_sequence,
+	CASE
+	  WHEN gd.team_id = g.home_team_id AND g.pts_home > g.pts_away THEN 1
+	  WHEN gd.team_id = g.team_id_away AND g.pts_away > g.pts_home THEN 1
+	  ELSE 0
+	END is_win,
+	
+	gd.game_id,
+	g.game_date_est,
+	gd.team_abbreviation
+
+FROM games_details_deduped AS gd
+
+JOIN games AS g
+		on g.game_id = gd.game_id
+
+WHERE row_num = 1 
+
+
+),
+
+rolling_wins AS (
+    SELECT
+        game_id,
+        game_date_est,
+        team_abbreviation,
+        team_games_sequence,
+        MAX(is_win) AS is_win,  -- Same for all players on the team
+        SUM(MAX(is_win)) OVER(
+            PARTITION BY team_abbreviation 
+            ORDER BY game_date_est 
+            ROWS BETWEEN 89 PRECEDING AND CURRENT ROW
+        ) AS rolling_90_game_wins
+    FROM data_setup
+    GROUP BY game_id, game_date_est, team_abbreviation, team_games_sequence
+)
+
+-- Find the maximum wins in any 90-game stretch and which team achieved it
+
+SELECT 
+    team_abbreviation,
+    game_date_est,
+    rolling_90_game_wins AS max_wins_in_90_games
+FROM rolling_wins
+WHERE team_games_sequence >= 90  -- Only consider stretches with full 90 games
+    AND rolling_90_game_wins = (
+        SELECT MAX(rolling_90_game_wins) 
+        FROM rolling_wins 
+        WHERE team_games_sequence >= 90
+    )
+ORDER BY game_date_est;
+
+-- June 4, 2017: GSW reached 77 wins in their 90-game window
+-- June 7, 2017: GSW maintained that 77-win peak for a few more games
+
+```
 
   - How many games in a row did LeBron James score over 10 points a game?
 
