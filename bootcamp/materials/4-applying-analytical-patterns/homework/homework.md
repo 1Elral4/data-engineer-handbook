@@ -8,6 +8,50 @@ The homework this week will be using the `players`, `players_scd`, and `player_s
   - A player that comes out of retirement should be `Returned from Retirement`
   - A player that stays out of the league should be `Stayed Retired`
   
+```sql
+WITH 
+players_indicators AS (
+
+	SELECT
+		player_name,
+		current_season,
+		years_since_last_active,
+		LAG(years_since_last_active, 1) OVER (PARTITION BY player_name ORDER BY current_season) as lag_y,
+		ROW_NUMBER() OVER (PARTITION BY player_name ORDER BY current_season) player_row_num,
+		is_active
+	
+	FROM players
+
+)
+
+SELECT
+	player_name,
+	current_season,
+	CASE 
+		WHEN player_row_num = 1 THEN 'New'
+		WHEN years_since_last_active = 1 THEN 'Retired'
+		WHEN years_since_last_active = 0 AND lag_y >= 1 THEN 'Returned from Retirement'
+		WHEN (years_since_last_active - lag_y) = 0 THEN 'Continued Playing'
+		ELSE 'Stayed Retired'
+	END AS player_status
+
+
+FROM players_indicators AS pi
+
+-- WHERE 
+-- TRUE
+-- -- and player_name = 'Aaron Brooks'
+-- -- draft_year::INT < current_season::INT
+-- -- and current_season = 2007
+-- -- AND draft_year <> 'Undrafted'
+-- -- AND draft_year = '2007'
+-- ORDER BY player_name desc, current_season
+-- LIMIT 100
+
+
+
+```
+
 - A query that uses `GROUPING SETS` to do efficient aggregations of `game_details` data
   - Aggregate this dataset along the following dimensions
     - player and team
