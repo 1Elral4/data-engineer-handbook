@@ -11,7 +11,17 @@ fasdjeinasdflkjfasdf
 
 ## Youtube
 
-I was a kid when YouTube was launched. It gained a lot of traction really fast, maintly dumb videos were uploaded. Silly videos got millions of views really easily. People on the creator side in the early stages were pioneers, there were not formulas for success. Over the years the people and the platform has matured into a solid platform with millions of users and creators.
+I was a kid when YouTube was launched. Back then, it quickly gained traction, mostly with silly or low-effort videos — the kind of random content that could unexpectedly go viral. Those early days felt like the Wild West of the internet. There were no formulas, no thumbnails optimized for click-through rate, no SEO strategies — just creators experimenting and putting things out there.
+
+On the creator side, it was pioneering. People weren’t thinking about careers or monetization — they were just having fun. But that raw experimentation laid the groundwork for what the platform has become.
+
+Over the years, the platform — and its people — matured. YouTube evolved from a place of casual entertainment to a structured ecosystem where creators understand audiences, build businesses, and develop communities. Viewers moved from passively watching funny clips to actively subscribing, commenting, and curating their experience.
+
+Now, with features like the homepage recommendation engine, custom playlists, membership programs, and even shorts, YouTube is no longer just a video site — it’s a complete content discovery and consumption platform.
+
+From a user’s point of view, it went from ‘What’s funny today?’ to ‘What can I learn, be inspired by, or deeply engage with?’
+
+YouTube’s impact is massive — not just culturally, but in how we consume, create, and interact with content today.
 
 ### Experiment 1: Home page recommended videos user customization
 #### Objective
