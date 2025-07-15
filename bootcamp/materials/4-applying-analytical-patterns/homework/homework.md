@@ -60,6 +60,51 @@ FROM players_indicators AS pi
       - Answer questions like who scored the most points in one season?
     - team
       - Answer questions like which team has won the most games?
+
+```sql
+WITH
+grouped_game_details AS (
+	SELECT
+		COALESCE(gd.player_name, '(overall)') AS player_name,
+		COALESCE(gd.team_abbreviation, '(overall)') AS team_abbreviation,
+		COALESCE(g.season::TEXT, '(overall)') AS season,
+		COALESCE(SUM(pts), 0) as pts
+	
+	FROM game_details AS gd
+	
+	JOIN games AS g
+		on g.game_id = gd.game_id
+	
+	GROUP BY GROUPING SETS (
+		(gd.player_name, gd.team_abbreviation),
+		(gd.player_name, g.season),
+	 	(gd.team_abbreviation)
+	)
+)
+
+(
+SELECT *, 'most points ever by a player' AS description FROM grouped_game_details
+WHERE 
+	TRUE
+	AND season = '(overall)'
+	AND player_name <> '(overall)'
+
+ORDER BY 4 DESC
+LIMIT 1
+)
+UNION ALL
+(
+SELECT *, 'most points in a season by a player' AS description FROM grouped_game_details
+WHERE 
+	TRUE
+	AND season <> '(overall)'
+	AND player_name <> '(overall)'
+
+
+ORDER BY 4 DESC
+LIMIT 1
+)
+```
       
 - A query that uses window functions on `game_details` to find out the following things:
   - What is the most games a team has won in a 90 game stretch? 
