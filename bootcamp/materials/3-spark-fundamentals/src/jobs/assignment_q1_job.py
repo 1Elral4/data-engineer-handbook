@@ -79,3 +79,5 @@ def main():
       .getOrCreate()
     output_df = do_generate_monthly_array_metrics(spark, spark.table("events"))
     output_df.write.mode("overwrite").insertInto("monthly_array_metrics")
+    
+    

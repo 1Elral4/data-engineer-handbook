@@ -2,4 +2,3 @@
 
 # Ignore Python bytecode files and cache folders
 __pycache__/
-*.py[cod]
