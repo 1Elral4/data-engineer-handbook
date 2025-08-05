@@ -20,9 +20,9 @@ WITH yesterday AS (
 INSERT INTO monthly_user_site_hits
 SELECT
     COALESCE(y.user_id, t.user_id) AS user_id,
-       COALESCE(y.hit_array,
-           array_fill(NULL::BIGINT, ARRAY[DATE('2023-03-03') - DATE('2023-03-01')]))
-        || ARRAY[t.num_hits] AS hits_array,
+    COALESCE(y.hit_array,
+        array_fill(NULL::BIGINT, ARRAY[DATE('2023-03-03') - DATE('2023-03-01')]))
+    || ARRAY[t.num_hits] AS hits_array,
     DATE('2023-03-01') as month_start,
     CASE WHEN y.first_found_date < t.today_date
         THEN y.first_found_date
@@ -53,7 +53,15 @@ today AS (
 
 SELECT
     COALESCE(y.user_id, t.user_id) AS user_id,
-    COALESCE(y.hit_array, array(NULL, NULL)) || ARRAY(t.num_hits) AS hits_array,
+    CASE 
+        WHEN y.hit_array IS NOT NULL THEN 
+            concat(y.hit_array, array(t.num_hits))
+        ELSE 
+            concat(
+                array_repeat(CAST(NULL AS BIGINT), datediff(DATE('2023-03-03'), DATE('2023-03-01'))),
+                array(t.num_hits)
+            )
+    END AS hits_array,
     '2023-03-01' as month_start,
     CAST(
         CASE 
