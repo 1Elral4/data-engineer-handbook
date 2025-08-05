@@ -6,7 +6,7 @@ from pyspark.sql.functions import col, to_date
 from datetime import date
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True) # to use it in several tests
 def with_empty_monthly_user_site_hits(spark):
     schema = StructType([
         StructField("user_id", StringType(), True),
